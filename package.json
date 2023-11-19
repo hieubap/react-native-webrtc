@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "restart": "adb reverse tcp:8081 tcp:8081 && react-native start --reset-cache",
     "release": "npx jetify && cd android && ./gradlew assembleRelease && cd ../",
     "android": "react-native run-android",
     "ios": "react-native run-ios",
@@ -15,7 +16,6 @@
     "@react-native-firebase/firestore": "^14.5.1",
     "react": "17.0.2",
     "react-native": "0.67.3",
-    "react-native-incall-manager": "^4.0.1",
     "react-native-webrtc": "^1.94.2"
   },
   "devDependencies": {

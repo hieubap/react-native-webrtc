@@ -1,8 +1,7 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useRef} from 'react';
 
 import {
   Button,
-  Dimensions,
   KeyboardAvoidingView,
   SafeAreaView,
   StyleSheet,
@@ -18,20 +17,15 @@ import {
   MediaStream,
   mediaDevices,
 } from 'react-native-webrtc';
-import InCallManager from 'react-native-incall-manager';
 import {useState} from 'react';
 
 import firestore from '@react-native-firebase/firestore';
 
-const {width, height} = Dimensions.get('screen');
 const App = () => {
   const [remoteStream, setRemoteStream] = useState(null);
   const [webcamStarted, setWebcamStarted] = useState(false);
-  const [screen, setScreen] = useState(1);
   const [localStream, setLocalStream] = useState(null);
-  const [join, setJoin] = useState(false);
   const [channelId, setChannelId] = useState(null);
-  const [callId, setCallId] = useState('');
   const pc = useRef();
   const servers = {
     iceServers: [
@@ -41,17 +35,11 @@ const App = () => {
           'stun:stun2.l.google.com:19302',
         ],
       },
-      {
-        url: 'turn:14.225.205.222:3478',
-        username: 'mainam',
-        credential: '123456',
-      },
     ],
     iceCandidatePoolSize: 10,
   };
 
   const startWebcam = async () => {
-    setScreen(3);
     pc.current = new RTCPeerConnection(servers);
     const local = await mediaDevices.getUserMedia({
       video: true,
@@ -78,24 +66,12 @@ const App = () => {
     pc.current.onaddstream = event => {
       setRemoteStream(event.stream);
     };
-    // InCallManager.setSpeakerphoneOn(true);
+
     setWebcamStarted(true);
   };
 
-  useEffect(() => {
-    if (webcamStarted) {
-      setTimeout(() => {
-        if (join) {
-          joinCall();
-        } else {
-          startCall();
-        }
-      }, 1000);
-    }
-  }, [webcamStarted]);
-
   const startCall = async () => {
-    const channelDoc = firestore().collection('channels').doc(callId);
+    const channelDoc = firestore().collection('channels').doc('X');
     const offerCandidates = channelDoc.collection('offerCandidates');
     const answerCandidates = channelDoc.collection('answerCandidates');
 
@@ -171,6 +147,7 @@ const App = () => {
     offerCandidates.onSnapshot(snapshot => {
       snapshot.docChanges().forEach(change => {
         if (change.type === 'added') {
+          console.log('offer change =))');
           const data = change.doc.data();
           pc.current.addIceCandidate(new RTCIceCandidate(data));
         }
@@ -178,75 +155,32 @@ const App = () => {
     });
   };
 
-  const changeCall = text => {
-    if (/^[a-zA-Z0-9]+$/.test(text) || text === '') {
-      setCallId(text);
-    }
-  };
-
-  const onStartCall = () => {
-    // setWebcamStarted(true);
-    setScreen(2);
-    setJoin(false);
-  };
-
-  const onJoinCall = () => {
-    // setWebcamStarted(true);
-    setScreen(2);
-    setJoin(true);
-  };
   return (
-    <KeyboardAvoidingView style={styles.body} behavior="height">
+    <KeyboardAvoidingView style={styles.body} behavior="position">
       <SafeAreaView>
+        {localStream && (
+          <RTCView
+            streamURL={localStream?.toURL()}
+            style={styles.stream}
+            objectFit="cover"
+            mirror
+          />
+        )}
+
+        {remoteStream && (
+          <RTCView
+            streamURL={remoteStream?.toURL()}
+            style={styles.stream}
+            objectFit="cover"
+            mirror
+          />
+        )}
         <View style={styles.buttons}>
-          {screen === 1 && (
-            <>
-              <TextInput
-                value={callId}
-                placeholder="Call ID: A-Z,a-z,0-9"
-                minLength={45}
-                style={{
-                  width: width * 0.5,
-                  borderWidth: 1,
-                  marginBottom: 15,
-                  padding: 5,
-                }}
-                onChangeText={newText => changeCall(newText)}
-              />
-              <Button title="Start call" onPress={onStartCall} />
-              <TextInput
-                value={channelId}
-                placeholder="Call ID: A-Z,a-z,0-9"
-                minLength={45}
-                style={{
-                  width: width * 0.5,
-                  borderWidth: 1,
-                  marginBottom: 15,
-                  padding: 5,
-                }}
-                onChangeText={newText => setChannelId(newText)}
-              />
-              <Button title="Join call" onPress={onJoinCall} />
-            </>
+          {!webcamStarted && (
+            <Button title="Start webcam" onPress={startWebcam} />
           )}
-          {screen === 2 && (
-            <>
-              <Button title="Start webcam" onPress={startWebcam} />
-              {/* <TextInput
-                value={callId}
-                placeholder="Call ID: A-Z,a-z,0-9"
-                minLength={45}
-                style={{
-                  width: width * 0.5,
-                  borderWidth: 1,
-                  marginBottom: 15,
-                  padding: 5,
-                }}
-                onChangeText={newText => changeCall(newText)}
-              /> */}
-            </>
-          )}
-          {/* {screen === 3 && (
+          {webcamStarted && <Button title="Start call" onPress={startCall} />}
+          {webcamStarted && (
             <View style={{flexDirection: 'row'}}>
               <Button title="Join call" onPress={joinCall} />
               <TextInput
@@ -257,25 +191,8 @@ const App = () => {
                 onChangeText={newText => setChannelId(newText)}
               />
             </View>
-          )} */}
+          )}
         </View>
-        {remoteStream && (
-          <RTCView
-            streamURL={remoteStream?.toURL()}
-            style={styles.stream}
-            objectFit="cover"
-            mirror
-          />
-        )}
-
-        {localStream && (
-          <RTCView
-            streamURL={localStream?.toURL()}
-            style={styles.stream1}
-            objectFit="contain"
-            mirror
-          />
-        )}
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -289,18 +206,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...StyleSheet.absoluteFill,
   },
-  stream1: {
-    flex: 2,
-    top: 40,
-    right: 10,
-    position: 'absolute',
-    width: width * 0.3,
-    height: height * 0.3,
-  },
   stream: {
     flex: 2,
-    width: width,
-    height: height - 50,
+    width: 200,
+    height: 200,
   },
   buttons: {
     alignItems: 'flex-start',
